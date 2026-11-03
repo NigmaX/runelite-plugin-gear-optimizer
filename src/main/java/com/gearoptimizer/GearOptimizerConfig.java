@@ -164,4 +164,10 @@ public interface GearOptimizerConfig extends Config
 	{
 		return -1;
 	}
+
+	@ConfigItem(keyName = "lastPlace", name = "", description = "", hidden = true)
+	default String lastPlace()
+	{
+		return "";
+	}
 }

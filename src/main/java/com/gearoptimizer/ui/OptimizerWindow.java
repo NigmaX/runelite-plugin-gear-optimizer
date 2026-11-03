@@ -91,6 +91,9 @@ public class OptimizerWindow extends JFrame implements StyleTab.Actions
 	private final JComboBox<Choice> profileCombo = new JComboBox<>();
 	private final JLabel bankLabel = Ui.small(" ", Ui.MUTED);
 	private final MonsterCard monsterCard = new MonsterCard(SIDEBAR_TEXT_WIDTH);
+	private final LocationsCard locationsCard;
+	/** The monster on the monster card. */
+	private Monster shownMonster;
 	private final LevelsCard levelsCard = new LevelsCard(this::skillIcon, SIDEBAR_TEXT_WIDTH);
 	private final JTabbedPane tabs = new JTabbedPane();
 	private final Map<Skill, ImageIcon> skillIconCache = new EnumMap<>(Skill.class);
@@ -133,6 +136,10 @@ public class OptimizerWindow extends JFrame implements StyleTab.Actions
 		this.itemIcons = new ItemIcons(itemManager);
 		this.prices = new PriceCache(plugin::lookupPrices);
 		this.search = new MonsterSearch(repository, plugin::selectMonster);
+		this.locationsCard = new LocationsCard(SIDEBAR_TEXT_WIDTH, plugin::selectPlace,
+			places -> plugin.showOnMap(shownMonster, places, this::showStatus),
+			places -> plugin.walkTo(shownMonster, places, this::showStatus),
+			() -> plugin.clearMapAndRoute(this::showStatus));
 
 		setIconImage(Ui.appIcon(32));
 		setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
@@ -263,6 +270,7 @@ public class OptimizerWindow extends JFrame implements StyleTab.Actions
 		c.insets = new Insets(0, 0, 8, 0);
 
 		column.add(monsterCard.getPanel(), c);
+		column.add(locationsCard.getPanel(), c);
 		column.add(levelsCard.getPanel(), c);
 		c.weighty = 1;
 		JPanel filler = new JPanel();
@@ -297,9 +305,14 @@ public class OptimizerWindow extends JFrame implements StyleTab.Actions
 		search.update();
 	}
 
-	public void showMonster(Monster monster)
+	/**
+	 * @param place where the player fights it, one of its location names, or null
+	 */
+	public void showMonster(Monster monster, String place)
 	{
+		shownMonster = monster;
 		monsterCard.show(monster);
+		locationsCard.show(repository.getLocations(monster.getId()), place);
 	}
 
 	public void showCalculating()
@@ -602,6 +615,7 @@ public class OptimizerWindow extends JFrame implements StyleTab.Actions
 			+ "Open your bank once so the optimizer knows what you own."));
 		addTab(TAB_DATA, TAB_DATA, null, new DataTab(plugin, config, repository, null, account()));
 		monsterCard.showNone();
+		locationsCard.showNone();
 		updateBankLabel(accountSync.getSnapshot());
 		refreshProfiles();
 	}

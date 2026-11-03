@@ -13,6 +13,7 @@ import javax.swing.BorderFactory;
 import javax.swing.JComboBox;
 import javax.swing.JPanel;
 import javax.swing.JSlider;
+import javax.swing.JToggleButton;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 
@@ -47,9 +48,14 @@ class SettingsRow extends JPanel
 			{"OFF", "Off", "Ignore slayer helm and black mask bonuses"},
 		}, settings.slayerMode(), value -> actions.changeSetting("slayerMode", value)));
 
-		left.add(Ui.toggle("Wilderness", settings.inWilderness(),
-			"Enables the bonuses of Craw's bow, Viggora's chainmace, Thammaron's sceptre and their upgrades",
-			on -> actions.changeSetting("inWilderness", on)));
+		// The place picked can put the fight in the Wilderness whatever the setting says
+		boolean wildernessPlace = result.getContext().isInWilderness() && !settings.inWilderness();
+		JToggleButton wilderness = Ui.toggle("Wilderness", result.getContext().isInWilderness(), wildernessPlace
+				? "On because the place you fight at is in the Wilderness"
+				: "Enables Craw's bow, Viggora's chainmace, Thammaron's sceptre and their upgrades, and blighted supplies",
+			on -> actions.changeSetting("inWilderness", on));
+		wilderness.setEnabled(!wildernessPlace);
+		left.add(wilderness);
 
 		left.add(Ui.toggle("Cannon", settings.cannon(),
 			"<html>Fire a dwarf multicannon alongside you. It shoots each monster around it about every 4.8s<br>"

@@ -23,7 +23,8 @@ Everything runs locally. Monster and item stats ship with the plugin, so it neve
   leaf-bladed weapons, wilderness weapons, enchanted bolts, tomes and elemental weaknesses.
 - **Never unsafe.** Earmuffs, nose peg, facemask, mirror shield, spiny helmet, insulated boots,
   boots of stone, witchwood icon and dragonfire protection always keep their slot, even when a
-  stronger item would fit there. Required slots show a padlock.
+  stronger item would fit there. Required slots show a padlock. Dragonfire protection is only asked
+  for when the monster breathes fire.
 - **Knows what to bring.** Rock hammer (not needed with a granite hammer or the gargoyle unlock),
   bag of salt, ice cooler, fungicide, antifire, antipoison, runes, prayer potions, food and
   potions, laid out as a 28-slot inventory.
@@ -34,6 +35,8 @@ Everything runs locally. Monster and item stats ship with the plugin, so it neve
 - **Bank tools.** Outline the setup in your bank, or open a bank tab holding only the gear and
   supplies you need.
 - **Dwarf multicannon.** Optional: adds the cannon's damage, cannonballs and parts to the setup.
+- **Where to find it.** Lists where each monster lives, pins it on the world map, and asks the
+  Shortest Path plugin for a route there.
 
 ## How to use
 
@@ -42,8 +45,9 @@ Everything runs locally. Monster and item stats ship with the plugin, so it neve
 2. Open your bank once, so the plugin knows what you own. The top right shows when the bank was
    last synced.
 3. Choose a monster, in any of these ways:
-   - type its name in the search box;
-   - right-click it in game and pick **Gear setup**;
+   - type its name in the search box: there's a row for each place it lives, and you can add a place
+     to the search, like "wyrm wyrmscraig";
+   - right-click it in game and pick **Gear setup** (this also picks the place it's at);
    - attack it and press **Use target**;
    - turn on **Auto-select target** in the plugin settings to follow whatever you attack.
 4. Read the recommendation on the **Melee**, **Ranged** and **Magic** tabs. The best style is
@@ -62,7 +66,7 @@ Under the numbers are the settings that change them. They apply to every tab:
 |---|---|
 | Prayer | Your best unlocked offensive prayer for that style (Piety, Rigour, Augury), or none. |
 | Slayer task | **Auto** reads your current task from the Slayer plugin; **On** and **Off** override it. |
-| Wilderness | Turns on the bonuses of Craw's bow, Viggora's chainmace, Thammaron's sceptre and their upgrades. |
+| Wilderness | Turns on the bonuses of Craw's bow, Viggora's chainmace, Thammaron's sceptre and their upgrades, and allows blighted supplies. It turns on by itself when the place you fight at is in the Wilderness. |
 | Cannon | Adds a dwarf multicannon firing alongside you. |
 | Targets hit | How many monsters are stacked together, for burst/barrage, chinchompas and the cannon. **Auto** assumes 4 only on tasks that are known to stack (dust devils, nechryael, abyssal demons, smoke devils, maniacal monkeys). |
 | Priority | Slide from pure DPS towards defence. |
@@ -113,6 +117,24 @@ normal view, including the slayer task.
 
 These use RuneLite's Bank Tags plugin, which must be turned on.
 
+### Where to find it
+
+Under the monster card, **Where to find it** lists the places the monster lives, from the wiki's
+location tables. The place you fight at is highlighted; click another to switch. Some rules depend on
+it: boots of stone are only required in the Karuulm Slayer Dungeon, so wyrms in Wyrmscraig don't
+need them, and blighted supplies are only packed for the Wilderness.
+
+- The **map** button pins the place on the world map and centres the map there when you open it.
+  Monsters get a red pin with the Slayer skull. A dungeon or cave also gets gold pins with the
+  dungeon icon at its entrances on the surface. Open the world map on the surface and it centres on
+  the nearest entrance; open it inside the dungeon and it centres on the monsters.
+- While pins are shown, the world map's bottom bar has a **Focus on** button, beside the zoom
+  buttons, that brings the map back to them.
+- The **route** button asks the [Shortest Path](https://runelite.net/plugin-hub/show/shortest-path)
+  plugin for a route. Install Shortest Path from the Plugin Hub to use it.
+- The buttons by the title act on every place: pin them all, route to whichever is quickest to
+  reach, or clear the pins and the route.
+
 ### Cannon and stacked monsters
 
 - **Cannon accuracy.** The cannon uses your own accuracy: ranged with a ranged weapon, otherwise
@@ -152,6 +174,8 @@ saves them in `.runelite/gear-optimizer`. Your account data is stored in your Ru
   are yours to set.
 - Gear stored outside the bank, inventory and worn slots (POH costume room, looting bag) isn't
   seen until it's back in one of those.
+- Locations come from the wiki's location tables. Some monsters, mostly instanced bosses such as
+  Zulrah and the Fight Caves, have none.
 
 ## Development
 
@@ -177,13 +201,24 @@ scripts/update_data.py
 ```
 
 It downloads the OSRS Wiki DPS calculator dataset and writes trimmed copies to
-`src/main/resources/com/gearoptimizer/data/`.
+`src/main/resources/com/gearoptimizer/data/`. Then refresh the monster locations:
+
+```bash
+scripts/update_locations.py
+```
+
+It reads the location table of every monster's wiki page, finds dungeon entrances from the places'
+wiki pages and Shortest Path's transport table, and writes `locations.json` next to the other data.
+The plugin only reads the bundled copy.
 
 ## Credits
 
-Monster and equipment data: OSRS Wiki contributors, [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/),
+Monster, equipment and location data: OSRS Wiki contributors, [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/),
 via [weirdgloop/osrs-dps-calc](https://github.com/weirdgloop/osrs-dps-calc). DPS formulas follow that
 calculator.
+
+Dungeon entrances also use the transport table of the
+[Shortest Path](https://github.com/Skretzo/shortest-path) plugin (BSD 2-Clause).
 
 ## License
 

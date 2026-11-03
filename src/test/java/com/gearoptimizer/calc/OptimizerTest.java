@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import net.runelite.api.Skill;
 import net.runelite.api.gameval.ItemID;
+import net.runelite.api.gameval.NpcID;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -984,6 +985,36 @@ public class OptimizerTest
 			boolean slayerHelm = GearEffects.hasSlayerHelm(melee.getLoadout());
 			assertEquals("on task: " + onTask + ", head " + melee.getLoadout().stats(GearSlot.HEAD).getName(), onTask, slayerHelm);
 		}
+	}
+
+	@Test
+	public void bootsOfStoneOnlyInKaruulm()
+	{
+		Monster wyrm = repository.getMonster(NpcID.WYRM_LIGHT);
+		AccountSnapshot account = account("Abyssal whip");
+		assertNotNull(MonsterRules.forMonster(wyrm, account, "Karuulm Slayer Dungeon - lower level").requirementFor(GearSlot.FEET));
+		assertNull(MonsterRules.forMonster(wyrm, account, "Wyrmscraig Cavern").requirementFor(GearSlot.FEET));
+		// Unknown place: wyrms are mostly fought in Karuulm, wyrmlings never are
+		assertNotNull(MonsterRules.forMonster(wyrm, account, null).requirementFor(GearSlot.FEET));
+		assertNull(MonsterRules.forMonster(repository.getMonster(NpcID.WYRMSCRAIG_WYRM01), account, null).requirementFor(GearSlot.FEET));
+	}
+
+	@Test
+	public void onlyFireBreathersNeedDragonfireProtection()
+	{
+		AccountSnapshot account = account("Abyssal whip");
+		MonsterRules wyrm = MonsterRules.forMonster(repository.getMonster(NpcID.WYRM_LIGHT), account, "Wyrmscraig Cavern");
+		assertNull(wyrm.requirementFor(GearSlot.SHIELD));
+		assertNotNull(MonsterRules.forMonster(monster("Black dragon"), account).requirementFor(GearSlot.SHIELD));
+	}
+
+	@Test
+	public void blightedSuppliesOnlyWorkInTheWilderness()
+	{
+		AccountSnapshot account = account("Abyssal whip");
+		addConsumable(account, 900_001, "Blighted super restore(4)");
+		assertTrue(MonsterRules.matchingIds(account, MonsterRules.PRAYER_RESTORE, false).isEmpty());
+		assertEquals(1, MonsterRules.matchingIds(account, MonsterRules.PRAYER_RESTORE, true).size());
 	}
 
 	@Test

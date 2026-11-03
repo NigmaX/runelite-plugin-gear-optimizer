@@ -103,7 +103,7 @@ final class Ui
 
 	enum Glyph
 	{
-		CHECK, CROSS, WARNING, INFO, DOT, ARROW_UP, ARROW_DOWN, LOCK
+		CHECK, CROSS, WARNING, INFO, DOT, ARROW_UP, ARROW_DOWN, LOCK, MAP, ROUTE, PIN
 	}
 
 	private Ui()
@@ -475,6 +475,34 @@ final class Ui
 						break;
 					case ARROW_DOWN:
 						g.fillPolygon(new int[]{2, 10, 6}, new int[]{3, 3, 9}, 3);
+						break;
+					case MAP:
+						// A folded map
+						g.setStroke(new BasicStroke(1.4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+						g.drawPolygon(new int[]{1, 4, 8, 11, 11, 8, 4, 1}, new int[]{2, 1, 2, 1, 10, 11, 10, 11}, 8);
+						g.drawLine(4, 1, 4, 10);
+						g.drawLine(8, 2, 8, 11);
+						break;
+					case ROUTE:
+						// A dotted trail to a flag
+						g.fillOval(0, 9, 3, 3);
+						g.fillOval(3, 6, 2, 2);
+						g.fillOval(6, 6, 2, 2);
+						g.setStroke(new BasicStroke(1.4f));
+						g.drawLine(9, 1, 9, 9);
+						g.fillPolygon(new int[]{9, 12, 9}, new int[]{1, 3, 5}, 3);
+						break;
+					case PIN:
+						Path2D pin = new Path2D.Double();
+						pin.moveTo(6, 12);
+						pin.curveTo(4, 8, 1, 7, 1, 4.5);
+						pin.curveTo(1, 2, 3, 0, 6, 0);
+						pin.curveTo(9, 0, 11, 2, 11, 4.5);
+						pin.curveTo(11, 7, 8, 8, 6, 12);
+						pin.closePath();
+						g.fill(pin);
+						g.setColor(Color.WHITE);
+						g.fillOval(4, 3, 4, 4);
 						break;
 					default:
 						g.fillOval(3, 3, 6, 6);

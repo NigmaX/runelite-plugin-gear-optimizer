@@ -99,6 +99,14 @@ public class Monster
 		return hasAttribute("dragon");
 	}
 
+	/**
+	 * @param attackStyle as the wiki names it, e.g. "Dragonfire" or "Icy breath"
+	 */
+	public boolean attacksWith(String attackStyle)
+	{
+		return style != null && style.stream().anyMatch(attackStyle::equalsIgnoreCase);
+	}
+
 	public boolean isUndead()
 	{
 		return hasAttribute("undead");

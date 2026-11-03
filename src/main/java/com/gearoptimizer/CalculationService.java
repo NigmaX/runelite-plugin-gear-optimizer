@@ -45,6 +45,10 @@ class CalculationService
 	static class Job
 	{
 		Monster monster;
+		/** Where the player fights it, from its wiki locations; null when unknown. */
+		String place;
+		/** Whether that place is in the Wilderness. */
+		boolean wildernessPlace;
 		AccountSnapshot account;
 		/** The slayer task's name, or null when it isn't known (another account is shown). */
 		String slayerTask;
@@ -162,8 +166,9 @@ class CalculationService
 		boolean onTask = settings.isOnTask(job.getMonster(), job.getSlayerTask());
 		Optimizer.Input.InputBuilder input = Optimizer.Input.builder()
 			.monster(job.getMonster())
+			.place(job.getPlace())
 			.account(job.getAccount())
-			.contexts(settings.contexts(job.getMonster(), job.getAccount(), onTask))
+			.contexts(settings.contexts(job.getMonster(), job.getAccount(), onTask, job.isWildernessPlace()))
 			.defenceWeight(config.defenceWeight() / 100.0)
 			.excludedItemIds(settings.excluded())
 			.lockedItemIds(settings.locked())

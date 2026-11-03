@@ -22,12 +22,13 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.client.RuneLite;
 import net.runelite.client.game.ItemVariationMapping;
 
 /**
  * Holds the monster and equipment data. Loads the copy downloaded by {@link DataUpdater}
- * when present, otherwise the copy bundled with the plugin.
+ * when present, otherwise the copy bundled with the plugin. Monster locations are always the bundled copy.
  */
 @Slf4j
 @Singleton
@@ -36,6 +37,7 @@ public class GameDataRepository
 	public static final File DATA_DIR = new File(RuneLite.RUNELITE_DIR, "gear-optimizer");
 	static final String MONSTERS_FILE = "monsters.json";
 	static final String EQUIPMENT_FILE = "equipment.json";
+	private static final String LOCATIONS_FILE = "locations.json";
 
 	private static final Set<String> CHARGED_VERSIONS = Set.of("Charged", "Active", "Fully charged", "Normal", "Regular", "");
 	private static final Set<String> UNCHARGED_VERSIONS = Set.of("Uncharged", "Empty", "Inactive", "Partially charged");
@@ -46,19 +48,33 @@ public class GameDataRepository
 	private static final Type EQUIPMENT_LIST = new TypeToken<List<EquipmentItem>>()
 	{
 	}.getType();
+	private static final Type LOCATION_MAP = new TypeToken<Map<Integer, List<RawLocation>>>()
+	{
+	}.getType();
+
+	/** A location as stored: its spawn points and entrances flattened to x, y, plane triples. */
+	private static final class RawLocation
+	{
+		String name;
+		int[] points;
+		boolean underground;
+		boolean wilderness;
+		int[] entrances;
+	}
 
 	/** Everything one load produced; swapped in whole so readers never see half old, half new data. */
 	@AllArgsConstructor
 	private static final class Data
 	{
 		static final Data EMPTY = new Data(Collections.emptyList(), Collections.emptyMap(), Collections.emptyList(),
-			Collections.emptyMap(), Collections.emptyMap(), "Not loaded");
+			Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), "Not loaded");
 
 		final List<Monster> monsters;
 		final Map<Integer, Monster> monstersById;
 		final List<EquipmentItem> equipment;
 		final Map<Integer, EquipmentItem> equipmentById;
 		final Map<String, List<EquipmentItem>> equipmentByName;
+		final Map<Integer, List<MonsterLocation>> locations;
 		final String source;
 	}
 
@@ -106,10 +122,12 @@ public class GameDataRepository
 			loadedEquipment = readResource(EQUIPMENT_FILE, EQUIPMENT_LIST);
 		}
 
-		apply(loadedMonsters, loadedEquipment, source);
+		Map<Integer, List<MonsterLocation>> locations = data.locations.isEmpty() ? readLocations() : data.locations;
+		apply(loadedMonsters, loadedEquipment, locations, source);
 	}
 
-	void apply(List<Monster> loadedMonsters, List<EquipmentItem> loadedEquipment, String source)
+	private void apply(List<Monster> loadedMonsters, List<EquipmentItem> loadedEquipment,
+		Map<Integer, List<MonsterLocation>> locations, String source)
 	{
 		List<Monster> sortedMonsters = new ArrayList<>(loadedMonsters);
 		sortedMonsters.removeIf(m -> m.getName() == null || m.getSkills() == null || m.getDefensive() == null);
@@ -132,7 +150,8 @@ public class GameDataRepository
 			itemsByName.computeIfAbsent(item.getLowerName(), k -> new ArrayList<>()).add(item);
 		}
 
-		data = new Data(Collections.unmodifiableList(sortedMonsters), byId, Collections.unmodifiableList(items), itemsById, itemsByName, source);
+		data = new Data(Collections.unmodifiableList(sortedMonsters), byId, Collections.unmodifiableList(items), itemsById, itemsByName,
+			locations, source);
 		log.debug("Loaded {} monsters and {} items ({})", sortedMonsters.size(), items.size(), source);
 	}
 
@@ -164,6 +183,14 @@ public class GameDataRepository
 	public EquipmentItem getItem(int datasetId)
 	{
 		return data.equipmentById.get(datasetId);
+	}
+
+	/**
+	 * @return where the monster can be found, empty when the wiki doesn't say
+	 */
+	public List<MonsterLocation> getLocations(int npcId)
+	{
+		return data.locations.getOrDefault(npcId, Collections.emptyList());
 	}
 
 	/**
@@ -239,6 +266,49 @@ public class GameDataRepository
 		{
 			throw new IllegalStateException("Bundled gear optimizer data is missing: " + name, e);
 		}
+	}
+
+	/**
+	 * @return the bundled locations by monster id; empty if they can't be read, since nothing else depends on them
+	 */
+	private Map<Integer, List<MonsterLocation>> readLocations()
+	{
+		Map<Integer, List<RawLocation>> raw;
+		try
+		{
+			raw = readResource(LOCATIONS_FILE, LOCATION_MAP);
+		}
+		catch (IllegalStateException e)
+		{
+			log.warn("Monster locations are unavailable", e);
+			return Collections.emptyMap();
+		}
+		Map<Integer, List<MonsterLocation>> locations = new HashMap<>();
+		raw.forEach((npcId, places) ->
+		{
+			List<MonsterLocation> list = new ArrayList<>();
+			for (RawLocation place : places)
+			{
+				list.add(new MonsterLocation(place.name, worldPoints(place.points), place.underground, place.wilderness,
+					worldPoints(place.entrances)));
+			}
+			locations.put(npcId, Collections.unmodifiableList(list));
+		});
+		return locations;
+	}
+
+	private static List<WorldPoint> worldPoints(int[] triples)
+	{
+		if (triples == null)
+		{
+			return Collections.emptyList();
+		}
+		List<WorldPoint> points = new ArrayList<>();
+		for (int i = 0; i + 2 < triples.length; i += 3)
+		{
+			points.add(new WorldPoint(triples[i], triples[i + 1], triples[i + 2]));
+		}
+		return Collections.unmodifiableList(points);
 	}
 
 	/**

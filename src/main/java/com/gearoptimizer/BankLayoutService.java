@@ -6,9 +6,7 @@ import com.gearoptimizer.calc.StyleResult;
 import com.gearoptimizer.data.GearSlot;
 import com.gearoptimizer.data.OwnedItem;
 import com.gearoptimizer.ui.OptimizerWindow;
-import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.Arrays;
 import java.util.Collections;
@@ -230,8 +228,9 @@ class BankLayoutService
 		Dimension size = new Dimension(help.getWidth(), help.getHeight());
 		if (!size.equals(buttonSize))
 		{
-			client.getSpriteOverrides().put(BUTTON_SPRITE, ImageUtil.getImageSpritePixels(buttonImage(size, false), client));
-			client.getSpriteOverrides().put(BUTTON_HOVER_SPRITE, ImageUtil.getImageSpritePixels(buttonImage(size, true), client));
+			BufferedImage icon = OptimizerWindow.appIcon(Math.max(8, Math.min(size.width, size.height) - 8));
+			client.getSpriteOverrides().put(BUTTON_SPRITE, ImageUtil.getImageSpritePixels(GameButtons.stone(size, false, icon), client));
+			client.getSpriteOverrides().put(BUTTON_HOVER_SPRITE, ImageUtil.getImageSpritePixels(GameButtons.stone(size, true, icon), client));
 			buttonSize = size;
 		}
 		Widget button = help.getParent().createChild(-1, WidgetType.GRAPHIC);
@@ -267,31 +266,6 @@ class BankLayoutService
 			}
 		}
 		return null;
-	}
-
-	/**
-	 * A stone button like the bank's own, with the plugin's shield on it.
-	 */
-	private static BufferedImage buttonImage(Dimension size, boolean hover)
-	{
-		int w = size.width;
-		int h = size.height;
-		BufferedImage image = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
-		Graphics2D g = image.createGraphics();
-		g.setColor(hover ? new Color(88, 76, 60) : new Color(66, 57, 45));
-		g.fillRect(0, 0, w, h);
-		g.setColor(new Color(102, 89, 70));
-		g.drawLine(1, 1, w - 2, 1);
-		g.drawLine(1, 1, 1, h - 2);
-		g.setColor(new Color(38, 33, 26));
-		g.drawLine(1, h - 2, w - 2, h - 2);
-		g.drawLine(w - 2, 1, w - 2, h - 2);
-		g.setColor(new Color(16, 14, 11));
-		g.drawRect(0, 0, w - 1, h - 1);
-		int icon = Math.max(8, Math.min(w, h) - 8);
-		g.drawImage(OptimizerWindow.appIcon(icon), (w - icon) / 2, (h - icon) / 2, null);
-		g.dispose();
-		return image;
 	}
 
 	private boolean bankTagsActive()

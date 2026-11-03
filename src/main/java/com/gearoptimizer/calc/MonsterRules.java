@@ -70,11 +70,12 @@ public final class MonsterRules
 
 	/** Ticks to use a finishing item on the monster and get back to attacking. */
 	private static final int FINISH_TICKS = 3;
-	static final Pattern FOOD = Pattern.compile("^(shark|manta ray|anglerfish|cooked karambwan|monkfish|dark crab|sea turtle|tuna potato|"
-		+ "lobster|swordfish|potato with cheese|cooked moonlight antelope|cooked sunlight antelope|saradomin brew|curry|bass)",
-		Pattern.CASE_INSENSITIVE);
+	static final Pattern FOOD = Pattern.compile("^(blighted )?(manta ray|anglerfish|karambwan)|^(shark|cooked karambwan|monkfish|dark crab|"
+		+ "sea turtle|tuna potato|lobster|swordfish|potato with cheese|cooked moonlight antelope|cooked sunlight antelope|saradomin brew|"
+		+ "curry|bass)", Pattern.CASE_INSENSITIVE);
+	private static final Pattern BLIGHTED = Pattern.compile("^blighted ", Pattern.CASE_INSENSITIVE);
 	static final Pattern PRAYER_RESTORE = Pattern.compile(
-		"^(prayer potion|super restore|blighted super restore|sanfew serum|prayer regeneration)", Pattern.CASE_INSENSITIVE);
+		"^(prayer potion|(blighted )?super restore|sanfew serum|prayer regeneration)", Pattern.CASE_INSENSITIVE);
 	/** The cannon's base, stand, barrels and furnace, each with its ornamented version. */
 	private static final String[] CANNON_PART_NAMES = {"base", "stand", "barrels", "furnace"};
 	private static final int[][] CANNON_PARTS = {
@@ -96,6 +97,23 @@ public final class MonsterRules
 	}
 
 	public static MonsterRules forMonster(Monster monster, AccountSnapshot account)
+	{
+		return forMonster(monster, account, null);
+	}
+
+	/**
+	 * Karuulm Slayer Dungeon's floor burns without heat-proof boots. Wyrms and wyrmlings also live in Varlamore,
+	 * where it doesn't.
+	 */
+	private static boolean inKaruulm(String name, String place)
+	{
+		return place == null ? !name.startsWith("wyrmling") : place.toLowerCase().contains("karuulm");
+	}
+
+	/**
+	 * @param place where the player fights it, from its wiki locations, or null when unknown
+	 */
+	public static MonsterRules forMonster(Monster monster, AccountSnapshot account, String place)
 	{
 		MonsterRules rules = new MonsterRules();
 		String name = monster.getName().toLowerCase();
@@ -128,7 +146,7 @@ public final class MonsterRules
 		{
 			rules.slot("Witchwood icon", GearSlot.NECK, "^witchwood icon");
 		}
-		if (matches(name, "^(wyrm|drake|hydra|alchemical hydra|sulphur lizard|wyrmling)"))
+		if (matches(name, "^(wyrm|drake|hydra|alchemical hydra|sulphur lizard|wyrmling)") && inKaruulm(name, place))
 		{
 			rules.slot("Boots of stone (Karuulm)", GearSlot.FEET, "^(boots of stone|boots of brimstone|granite boots)");
 		}
@@ -186,14 +204,15 @@ public final class MonsterRules
 			rules.notes.add("Shamans' acid spit is dodgeable; antipoison recommended.");
 		}
 
-		if (monster.isDragon())
+		// Only monsters that breathe fire or ice need protection from it; wyrms, hydras and baby dragons don't
+		if (monster.attacksWith("Icy breath"))
+		{
+			rules.slot("Wyvern protection", GearSlot.SHIELD, "^(elemental shield|mind shield|dragonfire ward|dragonfire shield|ancient wyvern shield)");
+		}
+		else if (monster.attacksWith("Dragonfire"))
 		{
 			boolean ownsAntifire = owns(account, Pattern.compile("^(extended )?(super )?antifire|^antifire mix", Pattern.CASE_INSENSITIVE));
-			if (matches(name, "wyvern"))
-			{
-				rules.slot("Wyvern protection", GearSlot.SHIELD, "^(elemental shield|mind shield|dragonfire ward|dragonfire shield|ancient wyvern shield)");
-			}
-			else if (ownsAntifire)
+			if (ownsAntifire)
 			{
 				rules.inventory("Antifire potion", "^(extended )?(super )?antifire|^antifire mix", true,
 					l -> GearEffects.lowerName(l.stats(GearSlot.SHIELD)).matches("^(anti-dragon shield|dragonfire shield|dragonfire ward|ancient wyvern shield).*")
@@ -289,7 +308,7 @@ public final class MonsterRules
 			{
 				continue;
 			}
-			result.add(check(requirement.getLabel(), requirement.getPattern(), requirement.isMandatory(), account));
+			result.add(check(requirement.getLabel(), requirement.getPattern(), requirement.isMandatory(), account, ctx.isInWilderness()));
 		}
 
 		if (loadout.getSpell() != null)
@@ -305,9 +324,9 @@ public final class MonsterRules
 		}
 		if (prayer != PrayerBoost.NONE)
 		{
-			result.add(check("Prayer potions (" + prayer.getDisplayName() + ")", PRAYER_RESTORE, false, account));
+			result.add(check("Prayer potions (" + prayer.getDisplayName() + ")", PRAYER_RESTORE, false, account, ctx.isInWilderness()));
 		}
-		result.add(check("Food", FOOD, false, account));
+		result.add(check("Food", FOOD, false, account, ctx.isInWilderness()));
 		return result;
 	}
 
@@ -353,9 +372,9 @@ public final class MonsterRules
 			count > 0 ? Set.of(itemId) : Collections.emptySet());
 	}
 
-	private static CheckedItem check(String label, Pattern pattern, boolean mandatory, AccountSnapshot account)
+	private static CheckedItem check(String label, Pattern pattern, boolean mandatory, AccountSnapshot account, boolean wilderness)
 	{
-		Set<Integer> ids = matchingIds(account, pattern);
+		Set<Integer> ids = matchingIds(account, pattern, wilderness);
 		int count = 0;
 		String example = null;
 		for (int id : ids)
@@ -433,6 +452,19 @@ public final class MonsterRules
 			}
 		}
 		return "Water".equals(rune) && weapon.startsWith("kodai wand");
+	}
+
+	/**
+	 * @param wilderness whether blighted supplies count; they only work in the Wilderness
+	 */
+	public static Set<Integer> matchingIds(AccountSnapshot account, Pattern pattern, boolean wilderness)
+	{
+		Set<Integer> ids = matchingIds(account, pattern);
+		if (!wilderness)
+		{
+			ids.removeIf(id -> BLIGHTED.matcher(String.valueOf(account.nameOf(id))).find());
+		}
+		return ids;
 	}
 
 	public static Set<Integer> matchingIds(AccountSnapshot account, Pattern pattern)

@@ -21,8 +21,8 @@ public final class InventoryPlan
 	private static final Pattern RUNE_POUCH = Pattern.compile("^(divine )?rune pouch", Pattern.CASE_INSENSITIVE);
 	/** Food from best to worst healing. */
 	private static final List<Pattern> FOODS = Stream.of(
-		"^manta ray", "^anglerfish", "^dark crab", "^sea turtle", "^tuna potato", "^shark", "^cooked karambwan",
-		"^potato with cheese", "^monkfish", "^swordfish", "^bass", "^lobster", "^curry")
+		"^(blighted )?manta ray", "^(blighted )?anglerfish", "^dark crab", "^sea turtle", "^tuna potato", "^shark",
+		"^(cooked|blighted) karambwan", "^potato with cheese", "^monkfish", "^swordfish", "^bass", "^lobster", "^curry")
 		.map(regex -> Pattern.compile(regex, Pattern.CASE_INSENSITIVE))
 		.collect(Collectors.toList());
 
@@ -44,6 +44,8 @@ public final class InventoryPlan
 	public static List<Slot> build(StyleResult result, AccountSnapshot account)
 	{
 		List<Slot> slots = new ArrayList<>();
+		// Blighted supplies only work in the Wilderness
+		boolean wilderness = result.getContext().isInWilderness();
 
 		for (MonsterRules.CheckedItem item : result.getInventory())
 		{
@@ -91,20 +93,20 @@ public final class InventoryPlan
 		PotionBoost potion = result.getContext().getPotion();
 		if (potion != PotionBoost.NONE && potion.getItemPattern() != null)
 		{
-			int id = best(account, MonsterRules.matchingIds(account, potion.getItemPattern()));
+			int id = best(account, MonsterRules.matchingIds(account, potion.getItemPattern(), wilderness));
 			slots.add(id < 0 ? new Slot(-1, potion.getDisplayName(), 0, false, false) : new Slot(id, account.nameOf(id), 1, true, false));
 		}
 
 		if (result.getContext().getPrayer() != PrayerBoost.NONE)
 		{
-			int id = best(account, MonsterRules.matchingIds(account, MonsterRules.PRAYER_RESTORE));
+			int id = best(account, MonsterRules.matchingIds(account, MonsterRules.PRAYER_RESTORE, wilderness));
 			for (int i = 0; i < PRAYER_POTIONS; i++)
 			{
 				slots.add(id < 0 ? new Slot(-1, "Prayer potion", 0, false, false) : new Slot(id, account.nameOf(id), 1, true, false));
 			}
 		}
 
-		int food = bestFood(account);
+		int food = bestFood(account, wilderness);
 		while (slots.size() < SLOTS)
 		{
 			slots.add(food < 0 ? new Slot(-1, "Food", 0, false, false) : new Slot(food, account.nameOf(food), 1, true, false));
@@ -132,11 +134,11 @@ public final class InventoryPlan
 		}
 	}
 
-	private static int bestFood(AccountSnapshot account)
+	private static int bestFood(AccountSnapshot account, boolean wilderness)
 	{
 		for (Pattern food : FOODS)
 		{
-			int id = best(account, MonsterRules.matchingIds(account, food));
+			int id = best(account, MonsterRules.matchingIds(account, food, wilderness));
 			if (id >= 0)
 			{
 				return id;

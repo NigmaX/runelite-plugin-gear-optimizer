@@ -29,6 +29,7 @@ public class CalculationSettings
 	public static final String EXCLUDED_ITEMS = "excludedItems";
 	public static final String LOCKED_ITEMS = "lockedItems";
 	static final String LAST_MONSTER = "lastMonsterId";
+	static final String LAST_PLACE = "lastPlace";
 	private static final String SLAYER_GROUP = "slayer";
 	private static final int MAX_AOE_TARGETS = 9;
 
@@ -43,9 +44,10 @@ public class CalculationSettings
 	}
 
 	/**
+	 * @param wildernessPlace the player fights in the Wilderness, whatever the Wilderness setting says
 	 * @return a combat context for each style the player wants compared
 	 */
-	Map<CombatStyle, CombatContext> contexts(Monster monster, AccountSnapshot account, boolean onTask)
+	Map<CombatStyle, CombatContext> contexts(Monster monster, AccountSnapshot account, boolean onTask, boolean wildernessPlace)
 	{
 		Map<CombatStyle, CombatContext> contexts = new EnumMap<>(CombatStyle.class);
 		String filter = config.styleFilter();
@@ -63,7 +65,7 @@ public class CalculationSettings
 				.prayer("NONE".equals(config.prayerMode()) ? PrayerBoost.NONE : PrayerBoost.best(style, account))
 				.potion(potion(style, account))
 				.onSlayerTask(onTask)
-				.inWilderness(config.inWilderness())
+				.inWilderness(config.inWilderness() || wildernessPlace)
 				.cannonMaxHit(cannonMaxHit)
 				.kandarinHardDiary(account.isKandarinHardDiary())
 				.aoeTargets(aoeTargets(monster))

@@ -68,6 +68,8 @@ public class Optimizer
 	public static class Input
 	{
 		Monster monster;
+		/** Where the player fights it, for rules that hold only in some places; null when unknown. */
+		String place;
 		AccountSnapshot account;
 		Map<CombatStyle, CombatContext> contexts;
 		/** 0 = pure DPS, 1 = pure defence. */
@@ -112,7 +114,7 @@ public class Optimizer
 	{
 		this.input = input;
 		this.prices = input.getPrices() == null ? Map.of() : input.getPrices();
-		this.rules = MonsterRules.forMonster(input.getMonster(), input.getAccount());
+		this.rules = MonsterRules.forMonster(input.getMonster(), input.getAccount(), input.getPlace());
 		Set<Integer> worn = new java.util.HashSet<>();
 		if (input.getAccount().getEquipment() != null)
 		{
