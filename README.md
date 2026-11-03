@@ -172,8 +172,9 @@ saves them in `.runelite/gear-optimizer`. Your account data is stored in your Ru
   guarantees, and they don't model boss mechanics.
 - Whether a spot is multi-combat or allows a cannon depends on where you fight, so those settings
   are yours to set.
-- Gear stored outside the bank, inventory and worn slots (POH costume room, looting bag) isn't
-  seen until it's back in one of those.
+- Gear put away while the bank is closed (a deposit box, the POH costume room, a looting bag)
+  still counts as yours until you next open your bank; the top right shows how many. After that,
+  gear kept outside the bank, inventory and worn slots isn't seen until it's back in one of those.
 - Locations come from the wiki's location tables. Some monsters, mostly instanced bosses such as
   Zulrah and the Fight Caves, have none.
 

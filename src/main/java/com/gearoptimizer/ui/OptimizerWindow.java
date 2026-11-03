@@ -915,12 +915,17 @@ public class OptimizerWindow extends JFrame implements StyleTab.Actions
 		{
 			bankLabel.setText("Bank not synced: open your bank once");
 			bankLabel.setForeground(Ui.WARN);
+			bankLabel.setToolTipText(null);
 			return;
 		}
 		long minutes = TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - account.getBankUpdatedAt());
 		String age = minutes < 1 ? "just now" : minutes < 60 ? minutes + " min ago"
 			: minutes < 1440 ? (minutes / 60) + " h ago" : (minutes / 1440) + " days ago";
-		bankLabel.setText(String.format("Bank synced %s, %d items", age, account.getBank().size()));
+		String text = String.format("Bank synced %s, %d items", age, account.getBank().size());
+		int putAway = account.putAwayCount();
+		bankLabel.setText(putAway > 0 ? text + ", " + putAway + " put away" : text);
+		bankLabel.setToolTipText(putAway > 0 ? "Gear that left your inventory or equipment while the bank was closed, like at a"
+			+ " deposit box. It still counts as yours until you next open your bank." : null);
 		bankLabel.setForeground(minutes > 1440 * 7 ? Ui.WARN : Ui.MUTED);
 	}
 

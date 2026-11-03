@@ -25,8 +25,10 @@ import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.StatChanged;
 import net.runelite.api.events.VarbitChanged;
+import net.runelite.api.gameval.InterfaceID;
 import net.runelite.api.gameval.InventoryID;
 import net.runelite.api.gameval.VarbitID;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.config.RuneScapeProfile;
@@ -34,10 +36,12 @@ import net.runelite.client.config.RuneScapeProfileType;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.RuneScapeProfileChanged;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.ItemStats;
 
 /**
  * Keeps an {@link AccountSnapshot} of the logged-in account in sync: bank (whenever it is open),
- * inventory, equipment, rune pouch, levels and relevant unlocks. Each account is saved to its own
+ * inventory, equipment, rune pouch, levels and relevant unlocks. Gear put away while the bank is
+ * closed still counts as owned until the bank is next open. Each account is saved to its own
  * RuneScape profile, so alts keep separate snapshots.
  */
 @Slf4j
@@ -78,6 +82,14 @@ public class AccountSyncService
 	private boolean refreshVars;
 	private int ticksSinceSave;
 
+	/** Whether the inventory and equipment have arrived since login, so the client's copies are current. */
+	private boolean inventorySeen;
+	private boolean wornSeen;
+	/** What they held at the last check, to spot gear put away; null until it's taken. */
+	private Item[] inventoryHeld;
+	private Item[] wornHeld;
+	private boolean heldChanged;
+
 	@Inject
 	AccountSyncService(Client client, ClientThread clientThread, ConfigManager configManager, ItemManager itemManager, Gson gson)
 	{
@@ -112,12 +124,27 @@ public class AccountSyncService
 	public void start()
 	{
 		live = loadSnapshot(null);
-		if (client.getGameState() == GameState.LOGGED_IN)
+		inventoryHeld = null;
+		wornHeld = null;
+		heldChanged = true;
+		boolean loggedIn = client.getGameState() == GameState.LOGGED_IN;
+		inventorySeen = loggedIn && client.getItemContainer(InventoryID.INV) != null;
+		wornSeen = loggedIn && client.getItemContainer(InventoryID.WORN) != null;
+		if (loggedIn)
 		{
 			readContainers();
 			refreshVars = true;
 		}
 		publish();
+	}
+
+	/**
+	 * @return whether the bank is open, so items leaving the inventory go into it
+	 */
+	public static boolean isBankOpen(Client client)
+	{
+		Widget items = client.getWidget(InterfaceID.Bankmain.ITEMS);
+		return items != null && !items.isHidden();
 	}
 
 	/**
@@ -186,17 +213,31 @@ public class AccountSyncService
 		live = loadSnapshot(null);
 		readContainers();
 		refreshVars = true;
+		// Start comparing afresh, so one account's gear isn't noted as put away by another
+		inventoryHeld = null;
+		wornHeld = null;
+		heldChanged = true;
 		publish();
 	}
 
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged event)
 	{
-		if (event.getGameState() == GameState.LOGGED_IN)
+		GameState state = event.getGameState();
+		if (state == GameState.LOGGED_IN)
 		{
 			refreshVars = true;
+			return;
 		}
-		else if (event.getGameState() == GameState.LOGIN_SCREEN && dirty)
+		if (state != GameState.LOADING)
+		{
+			// The inventory and equipment are sent again at the next login
+			inventorySeen = false;
+			wornSeen = false;
+			inventoryHeld = null;
+			wornHeld = null;
+		}
+		if (state == GameState.LOGIN_SCREEN && dirty)
 		{
 			save();
 		}
@@ -210,8 +251,10 @@ public class AccountSyncService
 		if (id == InventoryID.BANK)
 		{
 			Map<Integer, Integer> bank = toQuantities(event.getItemContainer());
-			changed = !bank.equals(live.getBank());
+			// Gear put away elsewhere is either in the bank now or no longer the account's
+			changed = !bank.equals(live.getBank()) || live.putAwayCount() > 0;
 			live.setBank(bank);
+			live.setPutAway(new HashMap<>());
 			live.setBankUpdatedAt(System.currentTimeMillis());
 			dirty = true;
 		}
@@ -221,6 +264,8 @@ public class AccountSyncService
 			Map<Integer, Integer> inventory = toQuantities(event.getItemContainer());
 			changed = live.getInventory() == null || !inventory.keySet().equals(live.getInventory().keySet());
 			live.setInventory(inventory);
+			inventorySeen = true;
+			heldChanged = true;
 			dirty = true;
 		}
 		else if (id == InventoryID.WORN)
@@ -229,6 +274,8 @@ public class AccountSyncService
 			Map<Integer, Integer> equipment = toSlots(event.getItemContainer());
 			changed = !equipment.equals(live.getEquipment());
 			live.setEquipment(equipment);
+			wornSeen = true;
+			heldChanged = true;
 		}
 		else
 		{
@@ -289,10 +336,54 @@ public class AccountSyncService
 			}
 		}
 
+		checkPutAway();
+
 		if (dirty && ++ticksSinceSave >= SAVE_INTERVAL_TICKS)
 		{
 			save();
 		}
+	}
+
+	/**
+	 * Notes gear that left the inventory and equipment while the bank was closed. Runs once a tick, after both have
+	 * changed, so gear moving between them isn't mistaken for gear leaving.
+	 */
+	private void checkPutAway()
+	{
+		if (!heldChanged || !inventorySeen || !wornSeen)
+		{
+			return;
+		}
+		ItemContainer inventory = client.getItemContainer(InventoryID.INV);
+		ItemContainer worn = client.getItemContainer(InventoryID.WORN);
+		if (inventory == null || worn == null)
+		{
+			return;
+		}
+		heldChanged = false;
+		Item[] inventoryNow = inventory.getItems().clone();
+		Item[] wornNow = worn.getItems().clone();
+		// With the bank open, gear leaving went into it, and the bank's own update shows that
+		if (inventoryHeld != null && !isBankOpen(client)
+			&& live.notePutAway(inventoryHeld, inventoryNow, wornHeld, wornNow, this::isGear, this::isStackable))
+		{
+			resolveNames();
+			dirty = true;
+			publish();
+		}
+		inventoryHeld = inventoryNow;
+		wornHeld = wornNow;
+	}
+
+	private boolean isGear(int itemId)
+	{
+		ItemStats stats = itemManager.getItemStats(itemId);
+		return stats != null && stats.isEquipable();
+	}
+
+	private boolean isStackable(int itemId)
+	{
+		return itemManager.getItemComposition(itemId).isStackable();
 	}
 
 	private void readContainers()

@@ -1,6 +1,7 @@
 package com.gearoptimizer;
 
 import com.gearoptimizer.account.AccountSnapshot;
+import com.gearoptimizer.account.AccountSyncService;
 import com.gearoptimizer.calc.InventoryPlan;
 import com.gearoptimizer.calc.StyleResult;
 import com.gearoptimizer.data.GearSlot;
@@ -184,7 +185,7 @@ class BankLayoutService
 			}
 			tagged = ids;
 			layoutManager.saveLayout(new Layout(TAG, cells));
-			boolean bankOpen = isBankOpen();
+			boolean bankOpen = AccountSyncService.isBankOpen(client);
 			if (bankOpen)
 			{
 				bankTagsService.openBankTag(TAG, 0);
@@ -278,11 +279,5 @@ class BankLayoutService
 			}
 		}
 		return false;
-	}
-
-	private boolean isBankOpen()
-	{
-		Widget items = client.getWidget(InterfaceID.Bankmain.ITEMS);
-		return items != null && !items.isHidden();
 	}
 }
